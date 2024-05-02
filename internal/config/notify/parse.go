@@ -161,6 +161,21 @@ func fetchSubSysTargets(ctx context.Context, cfg config.Config, subSys string, t
 			}
 			targets = append(targets, t)
 		}
+	case config.NotifyMsSQLSubSys:
+		mssqlTargets, err := GetNotifyMsSQL(cfg[config.NotifyMsSQLSubSys])
+		if err != nil {
+			return nil, err
+		}
+		for id, args := range mssqlTargets {
+			if !args.Enable {
+				continue
+			}
+			t, err := target.NewMsSQLTarget(id, args, logOnceIf)
+			if err != nil {
+				return nil, err
+			}
+			targets = append(targets, t)
+		}
 	case config.NotifyMySQLSubSys:
 		mysqlTargets, err := GetNotifyMySQL(cfg[config.NotifyMySQLSubSys])
 		if err != nil {
