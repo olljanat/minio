@@ -159,9 +159,10 @@ func filterAlgos(arg string, want []string, allowed []string) []string {
 
 func startSFTPServer(args []string) {
 	var (
-		port          int
-		publicIP      string
-		sshPrivateKey string
+		port            int
+		publicIP        string
+		sshPrivateKey   string
+		userCaPublicKey string
 	)
 	allowPubKeys := supportedPubKeyAuthAlgos
 	allowKexAlgos := preferredKexAlgos
@@ -197,6 +198,8 @@ func startSFTPServer(args []string) {
 			allowCiphers = filterAlgos(arg, strings.Split(tokens[1], ","), supportedCiphers)
 		case "mac-algos":
 			allowMACs = filterAlgos(arg, strings.Split(tokens[1], ","), supportedMACs)
+		case "user-ca-public-key":
+			userCaPublicKey = tokens[1]
 		}
 	}
 
@@ -216,6 +219,19 @@ func startSFTPServer(args []string) {
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
 		logger.Fatal(fmt.Errorf("invalid arguments passed, private key file is not parseable: %v", err), "unable to start SFTP server")
+	}
+
+	var caPublicKey ssh.PublicKey
+	if userCaPublicKey != "" {
+		userCaPublicKeyBytes, err := os.ReadFile(userCaPublicKey)
+		if err != nil {
+			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not accessible: %v", err), "unable to start SFTP server")
+		}
+
+		caPublicKey, _, _, _, err = ssh.ParseAuthorizedKey(userCaPublicKeyBytes)
+		if err != nil {
+			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not parseable: %v", err), "unable to start SFTP server")
+		}
 	}
 
 	// An SSH server is represented by a ServerConfig, which holds
@@ -276,6 +292,44 @@ func startSFTPServer(args []string) {
 			}
 			return nil, errAuthentication
 		},
+	}
+
+	if caPublicKey != nil {
+		sshConfig.PublicKeyCallback = func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			_, ok := globalIAMSys.GetUser(context.Background(), c.User())
+			if !ok {
+				return nil, errNoSuchUser
+			}
+
+			// Verify that client provided certificate, not only public key.
+			cert, ok := key.(*ssh.Certificate)
+			if !ok {
+				return nil, errAuthentication
+			}
+
+			// Verify that identity in certificate matches to username in authentication request.
+			if cert.KeyId != c.User() {
+				return nil, errAuthentication
+			}
+
+			// Extract data structure without signature from authentication message
+			// and remove last 4 bytes which represent the length of the non-existent
+			// signature field which appears there as result of Marshal()
+			signed := *cert
+			signed.Signature = nil
+			signedData := signed.Marshal()
+			signedData2 := signedData[:len(signedData)-4]
+
+			if err := caPublicKey.Verify(signedData2, cert.Signature); err != nil {
+				return nil, errAuthentication
+			}
+			return &ssh.Permissions{
+				CriticalOptions: map[string]string{
+					"accessKey": c.User(),
+				},
+				Extensions: make(map[string]string),
+			}, nil
+		}
 	}
 
 	sshConfig.AddHostKey(private)
