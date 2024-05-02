@@ -301,28 +301,12 @@ func startSFTPServer(args []string) {
 				return nil, errNoSuchUser
 			}
 
-			// Verify that client provided certificate, not only public key.
-			cert, ok := key.(*ssh.Certificate)
-			if !ok {
+			checker := ssh.CertChecker{}
+			_, err = checker.Authenticate(c, caPublicKey)
+			if err != nil {
 				return nil, errAuthentication
 			}
 
-			// Verify that identity in certificate matches to username in authentication request.
-			if cert.KeyId != c.User() {
-				return nil, errAuthentication
-			}
-
-			// Extract data structure without signature from authentication message
-			// and remove last 4 bytes which represent the length of the non-existent
-			// signature field which appears there as result of Marshal()
-			signed := *cert
-			signed.Signature = nil
-			signedData := signed.Marshal()
-			signedData2 := signedData[:len(signedData)-4]
-
-			if err := caPublicKey.Verify(signedData2, cert.Signature); err != nil {
-				return nil, errAuthentication
-			}
 			return &ssh.Permissions{
 				CriticalOptions: map[string]string{
 					"accessKey": c.User(),
