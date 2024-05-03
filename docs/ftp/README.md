@@ -244,8 +244,24 @@ hmac-sha1-96
 
 ### Certificate-based authentication
 
+`--sftp="trusted-user-ca-key=` specifies a file containing public key of certificate authority that is trusted to sign user certificates for authentication.
+
+Implementation is identical with "TrustedUserCAKeys" setting in OpenSSH server with following expections:
+- Only one CA key can be defined.
+- Only one identity per certificate is allowed.
+
+If a certificate is presented for authentication and has its signing CA key is in this file, then it may be used for authentication for user specified in the certificate's identity field.
+
+Note that certificates that lack a list of principals will not be permitted for authentication using trusted-user-ca-key. For more details on certificates, see the CERTIFICATES section in ssh-keygen(1).
+
+
 Certificate-based authentication can be enabled by defining trusted user CA public key.
 
-```
---sftp="trusted-user-ca-key=/home/miniouser/.ssh/user_ca.pub"
-```
+
+One time operation:
+ssh-keygen -f user_ca
+
+Per user operations
+ssh-keygen -f testuser
+
+ssh-keygen -s user_ca -I testuser -I testuser1 -I testuse2 testuser
