@@ -299,8 +299,20 @@ func startSFTPServer(args []string) {
 				return nil, errNoSuchUser
 			}
 
+			// Verify that client provided certificate, not only public key.
+			cert, ok := key.(*ssh.Certificate)
+			if !ok {
+				return nil, errors.New("public key authentication without certificate is not accepted")
+			}
+
+			// ssh.CheckCert called by ssh.Authenticate accepts certificates
+			// with empty principles list so we block those in here.
+			if len(cert.ValidPrincipals) == 0 {
+				return nil, errors.New("certificates without pricipals are not accepted")
+			}
+
 			// Verify that certificate provided by user is issued by trusted CA,
-			// identity in certificate matches to username in authentication request
+			// username in authentication request matches to identities in certificate
 			// and that certificate type is correct.
 			checker := ssh.CertChecker{}
 			checker.IsUserAuthority = func(k ssh.PublicKey) bool {
