@@ -160,10 +160,10 @@ func filterAlgos(arg string, want []string, allowed []string) []string {
 
 func startSFTPServer(args []string) {
 	var (
-		port            int
-		publicIP        string
-		sshPrivateKey   string
-		userCaPublicKey string
+		port          int
+		publicIP      string
+		sshPrivateKey string
+		userCaKeyFile string
 	)
 	allowPubKeys := supportedPubKeyAuthAlgos
 	allowKexAlgos := preferredKexAlgos
@@ -199,8 +199,8 @@ func startSFTPServer(args []string) {
 			allowCiphers = filterAlgos(arg, strings.Split(tokens[1], ","), supportedCiphers)
 		case "mac-algos":
 			allowMACs = filterAlgos(arg, strings.Split(tokens[1], ","), supportedMACs)
-		case "user-ca-public-key":
-			userCaPublicKey = tokens[1]
+		case "trusted-user-ca-key":
+			userCaKeyFile = tokens[1]
 		}
 	}
 
@@ -220,19 +220,6 @@ func startSFTPServer(args []string) {
 	private, err := ssh.ParsePrivateKey(privateBytes)
 	if err != nil {
 		logger.Fatal(fmt.Errorf("invalid arguments passed, private key file is not parseable: %v", err), "unable to start SFTP server")
-	}
-
-	var caPublicKey ssh.PublicKey
-	if userCaPublicKey != "" {
-		userCaPublicKeyBytes, err := os.ReadFile(userCaPublicKey)
-		if err != nil {
-			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not accessible: %v", err), "unable to start SFTP server")
-		}
-
-		caPublicKey, _, _, _, err = ssh.ParseAuthorizedKey(userCaPublicKeyBytes)
-		if err != nil {
-			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not parseable: %v", err), "unable to start SFTP server")
-		}
 	}
 
 	// An SSH server is represented by a ServerConfig, which holds
@@ -295,7 +282,17 @@ func startSFTPServer(args []string) {
 		},
 	}
 
-	if caPublicKey != nil {
+	if userCaKeyFile != "" {
+		keyBytes, err := os.ReadFile(userCaKeyFile)
+		if err != nil {
+			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not accessible: %v", err), "unable to start SFTP server")
+		}
+
+		caPublicKey, _, _, _, err := ssh.ParseAuthorizedKey(keyBytes)
+		if err != nil {
+			logger.Fatal(fmt.Errorf("invalid arguments passed, user CA public key file is not parseable: %v", err), "unable to start SFTP server")
+		}
+
 		sshConfig.PublicKeyCallback = func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			_, ok := globalIAMSys.GetUser(context.Background(), c.User())
 			if !ok {

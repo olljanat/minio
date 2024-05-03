@@ -247,5 +247,5 @@ hmac-sha1-96
 Certificate-based authentication can be enabled by defining trusted user CA public key.
 
 ```
---sftp="user-ca-public-key=/home/miniouser/.ssh/user_ca.pub"
+--sftp="trusted-user-ca-key=/home/miniouser/.ssh/user_ca.pub"
 ```
