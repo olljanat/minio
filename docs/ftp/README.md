@@ -264,4 +264,4 @@ ssh-keygen -f user_ca
 Per user operations
 ssh-keygen -f testuser
 
-ssh-keygen -s user_ca -I testuser -I testuser1 -I testuse2 testuser
+ssh-keygen -s user_ca -I olli-2024-05-03 -n olli olli.pub

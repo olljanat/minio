@@ -308,7 +308,7 @@ func startSFTPServer(args []string) {
 			// ssh.CheckCert called by ssh.Authenticate accepts certificates
 			// with empty principles list so we block those in here.
 			if len(cert.ValidPrincipals) == 0 {
-				return nil, errors.New("certificates without pricipals are not accepted")
+				return nil, errors.New("certificates without principals are not accepted")
 			}
 
 			// Verify that certificate provided by user is issued by trusted CA,
