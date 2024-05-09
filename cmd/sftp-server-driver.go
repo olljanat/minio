@@ -168,9 +168,10 @@ func (f *sftpDriver) getMinIOClient() (*minio.Client, error) {
 	}
 
 	return minio.New(f.endpoint, &minio.Options{
-		Creds:     credentials.NewStaticV4(ui.Credentials.AccessKey, ui.Credentials.SecretKey, ""),
-		Secure:    globalIsTLS,
-		Transport: globalRemoteFTPClientTransport,
+		Creds:           credentials.NewStaticV4(ui.Credentials.AccessKey, ui.Credentials.SecretKey, ""),
+		Secure:          globalIsTLS,
+		Transport:       globalRemoteFTPClientTransport,
+		CustomUserAgent: "MinIO SFTP Server",
 	})
 }
 
