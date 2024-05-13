@@ -713,6 +713,40 @@ func GetNotifyMQTT(mqttKVS map[string]config.KVS, rootCAs *x509.CertPool) (map[s
 	return mqttTargets, nil
 }
 
+// DefaultMsSQLKVS - default KV for MsSQL
+var (
+	DefaultMsSQLKVS = config.KVS{
+		config.KV{
+			Key:   config.Enable,
+			Value: config.EnableOff,
+		},
+		config.KV{
+			Key:   target.MsSQLFormat,
+			Value: formatNamespace,
+		},
+		config.KV{
+			Key:   target.MsSQLDSNString,
+			Value: "",
+		},
+		config.KV{
+			Key:   target.MsSQLTable,
+			Value: "",
+		},
+		config.KV{
+			Key:   target.MsSQLQueueDir,
+			Value: "",
+		},
+		config.KV{
+			Key:   target.MsSQLQueueLimit,
+			Value: "0",
+		},
+		config.KV{
+			Key:   target.MsSQLMaxOpenConnections,
+			Value: "2",
+		},
+	}
+)
+
 // DefaultMySQLKVS - default KV for MySQL
 var (
 	DefaultMySQLKVS = config.KVS{
@@ -746,6 +780,79 @@ var (
 		},
 	}
 )
+
+// GetNotifyMsSQL - returns a map of registered notification 'mssql' targets
+func GetNotifyMsSQL(mssqlKVS map[string]config.KVS) (map[string]target.MsSQLArgs, error) {
+	mssqlTargets := make(map[string]target.MsSQLArgs)
+	for k, kv := range config.Merge(mssqlKVS, target.EnvMsSQLEnable, DefaultMsSQLKVS) {
+		enableEnv := target.EnvMsSQLEnable
+		if k != config.Default {
+			enableEnv = enableEnv + config.Default + k
+		}
+
+		enabled, err := config.ParseBool(env.Get(enableEnv, kv.Get(config.Enable)))
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			continue
+		}
+
+		queueLimitEnv := target.EnvMsSQLQueueLimit
+		if k != config.Default {
+			queueLimitEnv = queueLimitEnv + config.Default + k
+		}
+		queueLimit, err := strconv.ParseUint(env.Get(queueLimitEnv, kv.Get(target.MsSQLQueueLimit)), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		formatEnv := target.EnvMsSQLFormat
+		if k != config.Default {
+			formatEnv = formatEnv + config.Default + k
+		}
+
+		dsnStringEnv := target.EnvMsSQLDSNString
+		if k != config.Default {
+			dsnStringEnv = dsnStringEnv + config.Default + k
+		}
+
+		tableEnv := target.EnvMsSQLTable
+		if k != config.Default {
+			tableEnv = tableEnv + config.Default + k
+		}
+
+		queueDirEnv := target.EnvMsSQLQueueDir
+		if k != config.Default {
+			queueDirEnv = queueDirEnv + config.Default + k
+		}
+
+		maxOpenConnectionsEnv := target.EnvMsSQLMaxOpenConnections
+		if k != config.Default {
+			maxOpenConnectionsEnv = maxOpenConnectionsEnv + config.Default + k
+		}
+
+		maxOpenConnections, cErr := strconv.Atoi(env.Get(maxOpenConnectionsEnv, kv.Get(target.MsSQLMaxOpenConnections)))
+		if cErr != nil {
+			return nil, cErr
+		}
+
+		mssqlArgs := target.MsSQLArgs{
+			Enable:             enabled,
+			Format:             env.Get(formatEnv, kv.Get(target.MsSQLFormat)),
+			DSN:                env.Get(dsnStringEnv, kv.Get(target.MsSQLDSNString)),
+			Table:              env.Get(tableEnv, kv.Get(target.MsSQLTable)),
+			QueueDir:           env.Get(queueDirEnv, kv.Get(target.MsSQLQueueDir)),
+			QueueLimit:         queueLimit,
+			MaxOpenConnections: maxOpenConnections,
+		}
+		if err = mssqlArgs.Validate(); err != nil {
+			return nil, err
+		}
+		mssqlTargets[k] = mssqlArgs
+	}
+	return mssqlTargets, nil
+}
 
 // GetNotifyMySQL - returns a map of registered notification 'mysql' targets
 func GetNotifyMySQL(mysqlKVS map[string]config.KVS) (map[string]target.MySQLArgs, error) {

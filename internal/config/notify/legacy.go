@@ -520,6 +520,70 @@ func SetNotifyNATS(s config.Config, natsName string, cfg target.NATSArgs) error 
 	return nil
 }
 
+// SetNotifyMsSQL - helper for config migration from older config.
+func SetNotifyMsSQL(s config.Config, sqlName string, cfg target.MsSQLArgs) error {
+	if !cfg.Enable {
+		return nil
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+
+	s[config.NotifyMsSQLSubSys][sqlName] = config.KVS{
+		config.KV{
+			Key:   config.Enable,
+			Value: config.EnableOn,
+		},
+		config.KV{
+			Key:   target.MsSQLFormat,
+			Value: cfg.Format,
+		},
+		config.KV{
+			Key:   target.MsSQLDSNString,
+			Value: cfg.DSN,
+		},
+		config.KV{
+			Key:   target.MsSQLTable,
+			Value: cfg.Table,
+		},
+		config.KV{
+			Key:   target.MsSQLHost,
+			Value: cfg.Host.String(),
+		},
+		config.KV{
+			Key:   target.MsSQLPort,
+			Value: cfg.Port,
+		},
+		config.KV{
+			Key:   target.MsSQLUsername,
+			Value: cfg.User,
+		},
+		config.KV{
+			Key:   target.MsSQLPassword,
+			Value: cfg.Password,
+		},
+		config.KV{
+			Key:   target.MsSQLDatabase,
+			Value: cfg.Database,
+		},
+		config.KV{
+			Key:   target.MsSQLQueueDir,
+			Value: cfg.QueueDir,
+		},
+		config.KV{
+			Key:   target.MsSQLQueueLimit,
+			Value: strconv.Itoa(int(cfg.QueueLimit)),
+		},
+		config.KV{
+			Key:   target.MsSQLMaxOpenConnections,
+			Value: strconv.Itoa(cfg.MaxOpenConnections),
+		},
+	}
+
+	return nil
+}
+
 // SetNotifyMySQL - helper for config migration from older config.
 func SetNotifyMySQL(s config.Config, sqlName string, cfg target.MySQLArgs) error {
 	if !cfg.Enable {

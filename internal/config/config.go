@@ -129,6 +129,7 @@ const (
 const (
 	NotifyKafkaSubSys    = madmin.NotifyKafkaSubSys
 	NotifyMQTTSubSys     = madmin.NotifyMQTTSubSys
+	NotifyMsSQLSubSys    = madmin.NotifyMsSQLSubSys
 	NotifyMySQLSubSys    = madmin.NotifyMySQLSubSys
 	NotifyNATSSubSys     = madmin.NotifyNATSSubSys
 	NotifyNSQSubSys      = madmin.NotifyNSQSubSys
