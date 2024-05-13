@@ -26,9 +26,13 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+
+	_ "github.com/denisenkom/go-mssqldb" // Register MS SQL driver
 
 	"github.com/minio/minio/internal/event"
 	"github.com/minio/minio/internal/logger"
@@ -38,147 +42,148 @@ import (
 )
 
 const (
-	mssqlTableExists = `SELECT 1 FROM %s;`
-	// Some MsSQL has a 3072 byte limit on key sizes.
-	mssqlCreateNamespaceTable = `CREATE TABLE %s (
-             key_name VARCHAR(3072) NOT NULL,
-             key_hash CHAR(64) GENERATED ALWAYS AS (SHA2(key_name, 256)) STORED NOT NULL PRIMARY KEY,
-             value JSON)
-           CHARACTER SET = utf8mb4 COLLATE = utf8mb4_bin ROW_FORMAT = Dynamic;`
-	mssqlCreateAccessTable = `CREATE TABLE %s (event_time DATETIME NOT NULL, event_data JSON)
-                                    ROW_FORMAT = Dynamic;`
+	mssqlTableExists          = `SELECT 1 FROM %s;`
+	mssqlCreateNamespaceTable = `CREATE TABLE %s (key VARCHAR PRIMARY KEY, value JSONB);`
+	mssqlCreateAccessTable    = `CREATE TABLE %s (event_time TIMESTAMP WITH TIME ZONE NOT NULL, event_data JSONB);`
 
-	mssqlUpdateRow = `INSERT INTO %s (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value);`
-	mssqlDeleteRow = `DELETE FROM %s WHERE key_hash = SHA2(?, 256);`
-	mssqlInsertRow = `INSERT INTO %s (event_time, event_data) VALUES (?, ?);`
+	mssqlUpdateRow = `INSERT INTO %s (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`
+	mssqlDeleteRow = `DELETE FROM %s WHERE key = $1;`
+	mssqlInsertRow = `INSERT INTO %s (event_time, event_data) VALUES ($1, $2);`
 )
 
-// MsSQL related constants
+// MsSql constants
 const (
-	MsSQLFormat             = "format"
-	MsSQLDSNString          = "dsn_string"
-	MsSQLTable              = "table"
-	MsSQLHost               = "host"
-	MsSQLPort               = "port"
-	MsSQLUsername           = "username"
-	MsSQLPassword           = "password"
-	MsSQLDatabase           = "database"
-	MsSQLQueueLimit         = "queue_limit"
-	MsSQLQueueDir           = "queue_dir"
-	MsSQLMaxOpenConnections = "max_open_connections"
+	MsSqlFormat             = "format"
+	MsSqlConnectionString   = "connection_string"
+	MsSqlTable              = "table"
+	MsSqlHost               = "host"
+	MsSqlPort               = "port"
+	MsSqlUsername           = "username"
+	MsSqlPassword           = "password"
+	MsSqlDatabase           = "database"
+	MsSqlQueueDir           = "queue_dir"
+	MsSqlQueueLimit         = "queue_limit"
+	MsSqlMaxOpenConnections = "max_open_connections"
 
-	EnvMsSQLEnable             = "MINIO_NOTIFY_MSSQL_ENABLE"
-	EnvMsSQLFormat             = "MINIO_NOTIFY_MSSQL_FORMAT"
-	EnvMsSQLDSNString          = "MINIO_NOTIFY_MSSQL_DSN_STRING"
-	EnvMsSQLTable              = "MINIO_NOTIFY_MSSQL_TABLE"
-	EnvMsSQLHost               = "MINIO_NOTIFY_MSSQL_HOST"
-	EnvMsSQLPort               = "MINIO_NOTIFY_MSSQL_PORT"
-	EnvMsSQLUsername           = "MINIO_NOTIFY_MSSQL_USERNAME"
-	EnvMsSQLPassword           = "MINIO_NOTIFY_MSSQL_PASSWORD"
-	EnvMsSQLDatabase           = "MINIO_NOTIFY_MSSQL_DATABASE"
-	EnvMsSQLQueueLimit         = "MINIO_NOTIFY_MSSQL_QUEUE_LIMIT"
-	EnvMsSQLQueueDir           = "MINIO_NOTIFY_MSSQL_QUEUE_DIR"
-	EnvMsSQLMaxOpenConnections = "MINIO_NOTIFY_MSSQL_MAX_OPEN_CONNECTIONS"
+	EnvMsSqlEnable             = "MINIO_NOTIFY_MSSQL_ENABLE"
+	EnvMsSqlFormat             = "MINIO_NOTIFY_MSSQL_FORMAT"
+	EnvMsSqlConnectionString   = "MINIO_NOTIFY_MSSQL_CONNECTION_STRING"
+	EnvMsSqlTable              = "MINIO_NOTIFY_MSSQL_TABLE"
+	EnvMsSqlHost               = "MINIO_NOTIFY_MSSQL_HOST"
+	EnvMsSqlPort               = "MINIO_NOTIFY_MSSQL_PORT"
+	EnvMsSqlUsername           = "MINIO_NOTIFY_MSSQL_USERNAME"
+	EnvMsSqlPassword           = "MINIO_NOTIFY_MSSQL_PASSWORD"
+	EnvMsSqlDatabase           = "MINIO_NOTIFY_MSSQL_DATABASE"
+	EnvMsSqlQueueDir           = "MINIO_NOTIFY_MSSQL_QUEUE_DIR"
+	EnvMsSqlQueueLimit         = "MINIO_NOTIFY_MSSQL_QUEUE_LIMIT"
+	EnvMsSqlMaxOpenConnections = "MINIO_NOTIFY_MSSQL_MAX_OPEN_CONNECTIONS"
 )
 
-// MsSQLArgs - MsSQL target arguments.
-type MsSQLArgs struct {
-	Enable             bool     `json:"enable"`
-	Format             string   `json:"format"`
-	DSN                string   `json:"dsnString"`
-	Table              string   `json:"table"`
-	Host               xnet.URL `json:"host"`
-	Port               string   `json:"port"`
-	User               string   `json:"user"`
-	Password           string   `json:"password"`
-	Database           string   `json:"database"`
-	QueueDir           string   `json:"queueDir"`
-	QueueLimit         uint64   `json:"queueLimit"`
-	MaxOpenConnections int      `json:"maxOpenConnections"`
+// MsSqlArgs - MsSql target arguments.
+type MsSqlArgs struct {
+	Enable             bool      `json:"enable"`
+	Format             string    `json:"format"`
+	ConnectionString   string    `json:"connectionString"`
+	Table              string    `json:"table"`
+	Host               xnet.Host `json:"host"`     // default: localhost
+	Port               string    `json:"port"`     // default: 5432
+	Username           string    `json:"username"` // default: user running minio
+	Password           string    `json:"password"` // default: no password
+	Database           string    `json:"database"` // default: same as user
+	QueueDir           string    `json:"queueDir"`
+	QueueLimit         uint64    `json:"queueLimit"`
+	MaxOpenConnections int       `json:"maxOpenConnections"`
 }
 
-// Validate MsSQLArgs fields
-func (m MsSQLArgs) Validate() error {
-	if !m.Enable {
+// Validate MsSqlArgs fields
+func (p MsSqlArgs) Validate() error {
+	if !p.Enable {
 		return nil
 	}
+	if p.Table == "" {
+		return fmt.Errorf("empty table name")
+	}
+	if err := validateMsSqlTableName(p.Table); err != nil {
+		return err
+	}
 
-	if m.Format != "" {
-		f := strings.ToLower(m.Format)
+	if p.Format != "" {
+		f := strings.ToLower(p.Format)
 		if f != event.NamespaceFormat && f != event.AccessFormat {
-			return fmt.Errorf("unrecognized format")
+			return fmt.Errorf("unrecognized format value")
 		}
 	}
 
-	if m.Table == "" {
-		return fmt.Errorf("table unspecified")
+	if p.ConnectionString != "" {
+		// No pq API doesn't help to validate connection string
+		// prior connection, so no validation for now.
+	} else {
+		// Some fields need to be specified when ConnectionString is unspecified
+		if p.Port == "" {
+			return fmt.Errorf("unspecified port")
+		}
+		if _, err := strconv.Atoi(p.Port); err != nil {
+			return fmt.Errorf("invalid port")
+		}
+		if p.Database == "" {
+			return fmt.Errorf("database unspecified")
+		}
 	}
 
-	// Some fields need to be specified when DSN is unspecified
-	if m.Port == "" {
-		return fmt.Errorf("unspecified port")
-	}
-	if _, err := strconv.Atoi(m.Port); err != nil {
-		return fmt.Errorf("invalid port")
-	}
-	if m.Database == "" {
-		return fmt.Errorf("database unspecified")
-	}
-
-	if m.QueueDir != "" {
-		if !filepath.IsAbs(m.QueueDir) {
+	if p.QueueDir != "" {
+		if !filepath.IsAbs(p.QueueDir) {
 			return errors.New("queueDir path should be absolute")
 		}
 	}
 
-	if m.MaxOpenConnections < 0 {
+	if p.MaxOpenConnections < 0 {
 		return errors.New("maxOpenConnections cannot be less than zero")
 	}
 
 	return nil
 }
 
-// MsSQLTarget - MsSQL target.
-type MsSQLTarget struct {
+// MsSqlTarget - MsSql target.
+type MsSqlTarget struct {
 	initOnce once.Init
 
 	id         event.TargetID
-	args       MsSQLArgs
+	args       MsSqlArgs
 	updateStmt *sql.Stmt
 	deleteStmt *sql.Stmt
 	insertStmt *sql.Stmt
 	db         *sql.DB
 	store      store.Store[event.Event]
 	firstPing  bool
+	connString string
 	loggerOnce logger.LogOnce
-
-	quitCh chan struct{}
+	quitCh     chan struct{}
 }
 
 // ID - returns target ID.
-func (target *MsSQLTarget) ID() event.TargetID {
+func (target *MsSqlTarget) ID() event.TargetID {
 	return target.id
 }
 
 // Name - returns the Name of the target.
-func (target *MsSQLTarget) Name() string {
+func (target *MsSqlTarget) Name() string {
 	return target.ID().String()
 }
 
 // Store returns any underlying store if set.
-func (target *MsSQLTarget) Store() event.TargetStore {
+func (target *MsSqlTarget) Store() event.TargetStore {
 	return target.store
 }
 
 // IsActive - Return true if target is up and active
-func (target *MsSQLTarget) IsActive() (bool, error) {
+func (target *MsSqlTarget) IsActive() (bool, error) {
 	if err := target.init(); err != nil {
 		return false, err
 	}
 	return target.isActive()
 }
 
-func (target *MsSQLTarget) isActive() (bool, error) {
+func (target *MsSqlTarget) isActive() (bool, error) {
 	if err := target.db.Ping(); err != nil {
 		if IsConnErr(err) {
 			return false, store.ErrNotConnected
@@ -188,11 +193,12 @@ func (target *MsSQLTarget) isActive() (bool, error) {
 	return true, nil
 }
 
-// Save - saves the events to the store which will be replayed when the SQL connection is active.
-func (target *MsSQLTarget) Save(eventData event.Event) error {
+// Save - saves the events to the store if questore is configured, which will be replayed when the MsSql connection is active.
+func (target *MsSqlTarget) Save(eventData event.Event) error {
 	if target.store != nil {
 		return target.store.Put(eventData)
 	}
+
 	if err := target.init(); err != nil {
 		return err
 	}
@@ -204,8 +210,8 @@ func (target *MsSQLTarget) Save(eventData event.Event) error {
 	return target.send(eventData)
 }
 
-// send - sends an event to the mssql.
-func (target *MsSQLTarget) send(eventData event.Event) error {
+// send - sends an event to the MsSql.
+func (target *MsSqlTarget) send(eventData event.Event) error {
 	if target.args.Format == event.NamespaceFormat {
 		objectName, err := url.QueryUnescape(eventData.S3.Object.Key)
 		if err != nil {
@@ -223,7 +229,6 @@ func (target *MsSQLTarget) send(eventData event.Event) error {
 
 			_, err = target.updateStmt.Exec(key, data)
 		}
-
 		return err
 	}
 
@@ -238,16 +243,16 @@ func (target *MsSQLTarget) send(eventData event.Event) error {
 			return err
 		}
 
-		_, err = target.insertStmt.Exec(eventTime, data)
-
-		return err
+		if _, err = target.insertStmt.Exec(eventTime, data); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// SendFromStore - reads an event from store and sends it to MsSQL.
-func (target *MsSQLTarget) SendFromStore(key store.Key) error {
+// SendFromStore - reads an event from store and sends it to MsSql.
+func (target *MsSqlTarget) SendFromStore(key store.Key) error {
 	if err := target.init(); err != nil {
 		return err
 	}
@@ -256,7 +261,6 @@ func (target *MsSQLTarget) SendFromStore(key store.Key) error {
 	if err != nil {
 		return err
 	}
-
 	if !target.firstPing {
 		if err := target.executeStmts(); err != nil {
 			if IsConnErr(err) {
@@ -287,8 +291,8 @@ func (target *MsSQLTarget) SendFromStore(key store.Key) error {
 	return target.store.Del(key.Name)
 }
 
-// Close - closes underneath connections to MsSQL database.
-func (target *MsSQLTarget) Close() error {
+// Close - closes underneath connections to MsSql database.
+func (target *MsSqlTarget) Close() error {
 	close(target.quitCh)
 	if target.updateStmt != nil {
 		// FIXME: log returned error. ignore time being.
@@ -306,14 +310,14 @@ func (target *MsSQLTarget) Close() error {
 	}
 
 	if target.db != nil {
-		return target.db.Close()
+		target.db.Close()
 	}
 
 	return nil
 }
 
 // Executes the table creation statements.
-func (target *MsSQLTarget) executeStmts() error {
+func (target *MsSqlTarget) executeStmts() error {
 	_, err := target.db.Exec(fmt.Sprintf(mssqlTableExists, target.args.Table))
 	if err != nil {
 		createStmt := mssqlCreateNamespaceTable
@@ -346,16 +350,15 @@ func (target *MsSQLTarget) executeStmts() error {
 	return nil
 }
 
-func (target *MsSQLTarget) init() error {
-	return target.initOnce.Do(target.initMsSQL)
+func (target *MsSqlTarget) init() error {
+	return target.initOnce.Do(target.initMsSql)
 }
 
-func (target *MsSQLTarget) initMsSQL() error {
+func (target *MsSqlTarget) initMsSql() error {
 	args := target.args
 
-	db, err := sql.Open("mssql", args.DSN)
+	db, err := sql.Open("mssql", target.connString)
 	if err != nil {
-		target.loggerOnce(context.Background(), err, target.ID().String())
 		return err
 	}
 	target.db = db
@@ -394,22 +397,44 @@ func (target *MsSQLTarget) initMsSQL() error {
 	return nil
 }
 
-// NewMsSQLTarget - creates new MsSQL target.
-func NewMsSQLTarget(id string, args MsSQLArgs, loggerOnce logger.LogOnce) (*MsSQLTarget, error) {
+// NewMsSqlTarget - creates new MsSql target.
+func NewMsSqlTarget(id string, args MsSqlArgs, loggerOnce logger.LogOnce) (*MsSqlTarget, error) {
+	params := []string{args.ConnectionString}
+	if args.ConnectionString == "" {
+		params = []string{}
+		if !args.Host.IsEmpty() {
+			params = append(params, "host="+args.Host.String())
+		}
+		if args.Port != "" {
+			params = append(params, "port="+args.Port)
+		}
+		if args.Username != "" {
+			params = append(params, "username="+args.Username)
+		}
+		if args.Password != "" {
+			params = append(params, "password="+args.Password)
+		}
+		if args.Database != "" {
+			params = append(params, "dbname="+args.Database)
+		}
+	}
+	connStr := strings.Join(params, " ")
+
 	var queueStore store.Store[event.Event]
 	if args.QueueDir != "" {
 		queueDir := filepath.Join(args.QueueDir, storePrefix+"-mssql-"+id)
 		queueStore = store.NewQueueStore[event.Event](queueDir, args.QueueLimit, event.StoreExtension)
 		if err := queueStore.Open(); err != nil {
-			return nil, fmt.Errorf("unable to initialize the queue store of MsSQL `%s`: %w", id, err)
+			return nil, fmt.Errorf("unable to initialize the queue store of MsSql `%s`: %w", id, err)
 		}
 	}
 
-	target := &MsSQLTarget{
+	target := &MsSqlTarget{
 		id:         event.TargetID{ID: id, Name: "mssql"},
 		args:       args,
 		firstPing:  false,
 		store:      queueStore,
+		connString: connStr,
 		loggerOnce: loggerOnce,
 		quitCh:     make(chan struct{}),
 	}
@@ -419,4 +444,44 @@ func NewMsSQLTarget(id string, args MsSQLArgs, loggerOnce logger.LogOnce) (*MsSQ
 	}
 
 	return target, nil
+}
+
+var errInvalidMsSqlTablename = errors.New("invalid MsSql table")
+
+func validateMsSqlTableName(name string) error {
+	// check for quoted string (string may not contain a quote)
+	if match, err := regexp.MatchString("^\"[^\"]+\"$", name); err != nil {
+		return err
+	} else if match {
+		return nil
+	}
+
+	// normalize the name to letters, digits, _ or $
+	valid := true
+	cleaned := strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsLetter(r):
+			return 'a'
+		case unicode.IsDigit(r):
+			return '0'
+		case r == '_', r == '$':
+			return r
+		default:
+			valid = false
+			return -1
+		}
+	}, name)
+
+	if valid {
+		// check for simple name or quoted name
+		// - letter/underscore followed by one or more letter/digit/underscore
+		// - any text between quotes (text cannot contain a quote itself)
+		if match, err := regexp.MatchString("^[a_][a0_$]*$", cleaned); err != nil {
+			return err
+		} else if match {
+			return nil
+		}
+	}
+
+	return errInvalidMsSqlTablename
 }

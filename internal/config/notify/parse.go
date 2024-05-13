@@ -161,8 +161,8 @@ func fetchSubSysTargets(ctx context.Context, cfg config.Config, subSys string, t
 			}
 			targets = append(targets, t)
 		}
-	case config.NotifyMsSQLSubSys:
-		mssqlTargets, err := GetNotifyMsSQL(cfg[config.NotifyMsSQLSubSys])
+	case config.NotifyMsSqlSubSys:
+		mssqlTargets, err := GetNotifyMsSql(cfg[config.NotifyMsSqlSubSys])
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func fetchSubSysTargets(ctx context.Context, cfg config.Config, subSys string, t
 			if !args.Enable {
 				continue
 			}
-			t, err := target.NewMsSQLTarget(id, args, logOnceIf)
+			t, err := target.NewMsSqlTarget(id, args, logOnceIf)
 			if err != nil {
 				return nil, err
 			}
@@ -713,35 +713,35 @@ func GetNotifyMQTT(mqttKVS map[string]config.KVS, rootCAs *x509.CertPool) (map[s
 	return mqttTargets, nil
 }
 
-// DefaultMsSQLKVS - default KV for MsSQL
+// DefaultMsSqlKVS - default MsSql KV for server config.
 var (
-	DefaultMsSQLKVS = config.KVS{
+	DefaultMsSqlKVS = config.KVS{
 		config.KV{
 			Key:   config.Enable,
 			Value: config.EnableOff,
 		},
 		config.KV{
-			Key:   target.MsSQLFormat,
+			Key:   target.MsSqlFormat,
 			Value: formatNamespace,
 		},
 		config.KV{
-			Key:   target.MsSQLDSNString,
+			Key:   target.MsSqlConnectionString,
 			Value: "",
 		},
 		config.KV{
-			Key:   target.MsSQLTable,
+			Key:   target.MsSqlTable,
 			Value: "",
 		},
 		config.KV{
-			Key:   target.MsSQLQueueDir,
+			Key:   target.MsSqlQueueDir,
 			Value: "",
 		},
 		config.KV{
-			Key:   target.MsSQLQueueLimit,
+			Key:   target.MsSqlQueueLimit,
 			Value: "0",
 		},
 		config.KV{
-			Key:   target.MsSQLMaxOpenConnections,
+			Key:   target.MsSqlMaxOpenConnections,
 			Value: "2",
 		},
 	}
@@ -781,11 +781,11 @@ var (
 	}
 )
 
-// GetNotifyMsSQL - returns a map of registered notification 'mssql' targets
-func GetNotifyMsSQL(mssqlKVS map[string]config.KVS) (map[string]target.MsSQLArgs, error) {
-	mssqlTargets := make(map[string]target.MsSQLArgs)
-	for k, kv := range config.Merge(mssqlKVS, target.EnvMsSQLEnable, DefaultMsSQLKVS) {
-		enableEnv := target.EnvMsSQLEnable
+// GetNotifyMsSql - returns a map of registered notification 'mssql' targets
+func GetNotifyMsSql(mssqlKVS map[string]config.KVS) (map[string]target.MsSqlArgs, error) {
+	mssqlTargets := make(map[string]target.MsSqlArgs)
+	for k, kv := range config.Merge(mssqlKVS, target.EnvMsSqlEnable, DefaultMsSqlKVS) {
+		enableEnv := target.EnvMsSqlEnable
 		if k != config.Default {
 			enableEnv = enableEnv + config.Default + k
 		}
@@ -798,52 +798,53 @@ func GetNotifyMsSQL(mssqlKVS map[string]config.KVS) (map[string]target.MsSQLArgs
 			continue
 		}
 
-		queueLimitEnv := target.EnvMsSQLQueueLimit
+		queueLimitEnv := target.EnvMsSqlQueueLimit
 		if k != config.Default {
 			queueLimitEnv = queueLimitEnv + config.Default + k
 		}
-		queueLimit, err := strconv.ParseUint(env.Get(queueLimitEnv, kv.Get(target.MsSQLQueueLimit)), 10, 64)
+
+		queueLimit, err := strconv.Atoi(env.Get(queueLimitEnv, kv.Get(target.MsSqlQueueLimit)))
 		if err != nil {
 			return nil, err
 		}
 
-		formatEnv := target.EnvMsSQLFormat
+		formatEnv := target.EnvMsSqlFormat
 		if k != config.Default {
 			formatEnv = formatEnv + config.Default + k
 		}
 
-		dsnStringEnv := target.EnvMsSQLDSNString
+		connectionStringEnv := target.EnvMsSqlConnectionString
 		if k != config.Default {
-			dsnStringEnv = dsnStringEnv + config.Default + k
+			connectionStringEnv = connectionStringEnv + config.Default + k
 		}
 
-		tableEnv := target.EnvMsSQLTable
+		tableEnv := target.EnvMsSqlTable
 		if k != config.Default {
 			tableEnv = tableEnv + config.Default + k
 		}
 
-		queueDirEnv := target.EnvMsSQLQueueDir
+		queueDirEnv := target.EnvMsSqlQueueDir
 		if k != config.Default {
 			queueDirEnv = queueDirEnv + config.Default + k
 		}
 
-		maxOpenConnectionsEnv := target.EnvMsSQLMaxOpenConnections
+		maxOpenConnectionsEnv := target.EnvMsSqlMaxOpenConnections
 		if k != config.Default {
 			maxOpenConnectionsEnv = maxOpenConnectionsEnv + config.Default + k
 		}
 
-		maxOpenConnections, cErr := strconv.Atoi(env.Get(maxOpenConnectionsEnv, kv.Get(target.MsSQLMaxOpenConnections)))
+		maxOpenConnections, cErr := strconv.Atoi(env.Get(maxOpenConnectionsEnv, kv.Get(target.MsSqlMaxOpenConnections)))
 		if cErr != nil {
 			return nil, cErr
 		}
 
-		mssqlArgs := target.MsSQLArgs{
+		mssqlArgs := target.MsSqlArgs{
 			Enable:             enabled,
-			Format:             env.Get(formatEnv, kv.Get(target.MsSQLFormat)),
-			DSN:                env.Get(dsnStringEnv, kv.Get(target.MsSQLDSNString)),
-			Table:              env.Get(tableEnv, kv.Get(target.MsSQLTable)),
-			QueueDir:           env.Get(queueDirEnv, kv.Get(target.MsSQLQueueDir)),
-			QueueLimit:         queueLimit,
+			Format:             env.Get(formatEnv, kv.Get(target.MsSqlFormat)),
+			ConnectionString:   env.Get(connectionStringEnv, kv.Get(target.MsSqlConnectionString)),
+			Table:              env.Get(tableEnv, kv.Get(target.MsSqlTable)),
+			QueueDir:           env.Get(queueDirEnv, kv.Get(target.MsSqlQueueDir)),
+			QueueLimit:         uint64(queueLimit),
 			MaxOpenConnections: maxOpenConnections,
 		}
 		if err = mssqlArgs.Validate(); err != nil {
@@ -851,6 +852,7 @@ func GetNotifyMsSQL(mssqlKVS map[string]config.KVS) (map[string]target.MsSQLArgs
 		}
 		mssqlTargets[k] = mssqlArgs
 	}
+
 	return mssqlTargets, nil
 }
 

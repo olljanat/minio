@@ -520,8 +520,8 @@ func SetNotifyNATS(s config.Config, natsName string, cfg target.NATSArgs) error 
 	return nil
 }
 
-// SetNotifyMsSQL - helper for config migration from older config.
-func SetNotifyMsSQL(s config.Config, sqlName string, cfg target.MsSQLArgs) error {
+// SetNotifyMsSql - helper for config migration from older config.
+func SetNotifyMsSql(s config.Config, psqName string, cfg target.MsSqlArgs) error {
 	if !cfg.Enable {
 		return nil
 	}
@@ -530,53 +530,53 @@ func SetNotifyMsSQL(s config.Config, sqlName string, cfg target.MsSQLArgs) error
 		return err
 	}
 
-	s[config.NotifyMsSQLSubSys][sqlName] = config.KVS{
+	s[config.NotifyMsSqlSubSys][psqName] = config.KVS{
 		config.KV{
 			Key:   config.Enable,
 			Value: config.EnableOn,
 		},
 		config.KV{
-			Key:   target.MsSQLFormat,
+			Key:   target.MsSqlFormat,
 			Value: cfg.Format,
 		},
 		config.KV{
-			Key:   target.MsSQLDSNString,
-			Value: cfg.DSN,
+			Key:   target.MsSqlConnectionString,
+			Value: cfg.ConnectionString,
 		},
 		config.KV{
-			Key:   target.MsSQLTable,
+			Key:   target.MsSqlTable,
 			Value: cfg.Table,
 		},
 		config.KV{
-			Key:   target.MsSQLHost,
+			Key:   target.MsSqlHost,
 			Value: cfg.Host.String(),
 		},
 		config.KV{
-			Key:   target.MsSQLPort,
+			Key:   target.MsSqlPort,
 			Value: cfg.Port,
 		},
 		config.KV{
-			Key:   target.MsSQLUsername,
-			Value: cfg.User,
+			Key:   target.MsSqlUsername,
+			Value: cfg.Username,
 		},
 		config.KV{
-			Key:   target.MsSQLPassword,
+			Key:   target.MsSqlPassword,
 			Value: cfg.Password,
 		},
 		config.KV{
-			Key:   target.MsSQLDatabase,
+			Key:   target.MsSqlDatabase,
 			Value: cfg.Database,
 		},
 		config.KV{
-			Key:   target.MsSQLQueueDir,
+			Key:   target.MsSqlQueueDir,
 			Value: cfg.QueueDir,
 		},
 		config.KV{
-			Key:   target.MsSQLQueueLimit,
+			Key:   target.MsSqlQueueLimit,
 			Value: strconv.Itoa(int(cfg.QueueLimit)),
 		},
 		config.KV{
-			Key:   target.MsSQLMaxOpenConnections,
+			Key:   target.MsSqlMaxOpenConnections,
 			Value: strconv.Itoa(cfg.MaxOpenConnections),
 		},
 	}

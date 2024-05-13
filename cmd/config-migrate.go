@@ -167,7 +167,7 @@ func readConfigWithoutMigrate(ctx context.Context, objAPI ObjectLayer) (config.C
 		notify.SetNotifyMQTT(newCfg, k, args)
 	}
 	for k, args := range cfg.Notify.MsSQL {
-		notify.SetNotifyMsSQL(newCfg, k, args)
+		notify.SetNotifyMsSql(newCfg, k, args)
 	}
 	for k, args := range cfg.Notify.MySQL {
 		notify.SetNotifyMySQL(newCfg, k, args)
