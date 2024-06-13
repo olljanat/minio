@@ -28,10 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/madmin-go/v3"
-	"github.com/minio/minio/internal/auth"
 	"github.com/minio/minio/internal/logger"
-	xldap "github.com/minio/pkg/v3/ldap"
 	xsftp "github.com/minio/pkg/v3/sftp"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -135,25 +132,29 @@ func sshPasswordAuth(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) 
 }
 
 func authenticateSSHConnection(c ssh.ConnMetadata, key ssh.PublicKey, pass []byte) (*ssh.Permissions, error) {
-	user, found := strings.CutSuffix(c.User(), "=ldap")
-	if found {
-		if !globalIAMSys.LDAPConfig.Enabled() {
-			return nil, errSFTPLDAPNotEnabled
+	/*
+		user, found := strings.CutSuffix(c.User(), "=ldap")
+		if found {
+				if !globalIAMSys.LDAPConfig.Enabled() {
+					return nil, errSFTPLDAPNotEnabled
+				}
+			return processLDAPAuthentication(key, pass, user)
 		}
-		return processLDAPAuthentication(key, pass, user)
-	}
+	*/
 
-	user, found = strings.CutSuffix(c.User(), "=svc")
+	user, found := strings.CutSuffix(c.User(), "=svc")
 	if found {
 		goto internalAuth
 	}
 
-	if globalIAMSys.LDAPConfig.Enabled() {
-		perms, _ := processLDAPAuthentication(key, pass, user)
-		if perms != nil {
-			return perms, nil
+	/*
+		if globalIAMSys.LDAPConfig.Enabled() {
+			perms, _ := processLDAPAuthentication(key, pass, user)
+			if perms != nil {
+				return perms, nil
+			}
 		}
-	}
+	*/
 
 internalAuth:
 	ui, ok := globalIAMSys.GetUser(context.Background(), user)
@@ -186,8 +187,20 @@ internalAuth:
 		},
 		Extensions: make(map[string]string),
 	}, nil
+
+	/*
+		return &ssh.Permissions{
+			CriticalOptions: map[string]string{
+				"AccessKey":    ui.Credentials.AccessKey,
+				"SecretKey":    ui.Credentials.SecretKey,
+				"SessionToken": ui.Credentials.SessionToken,
+			},
+			Extensions: make(map[string]string),
+		}, nil
+	*/
 }
 
+/*
 func processLDAPAuthentication(key ssh.PublicKey, pass []byte, user string) (perms *ssh.Permissions, err error) {
 	var lookupResult *xldap.DNSearchResult
 	var targetGroups []string
@@ -311,6 +324,7 @@ func processLDAPAuthentication(key ssh.PublicKey, pass []byte, user string) (per
 		Extensions: make(map[string]string),
 	}, nil
 }
+*/
 
 func validateKey(c ssh.ConnMetadata, clientKey ssh.PublicKey) (err error) {
 	if caPublicKey == nil {

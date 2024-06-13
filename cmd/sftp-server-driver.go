@@ -90,7 +90,8 @@ func (m *sftpMetrics) log(s *sftp.Request, user string) func(sz int64, err error
 // - sftp.Filelist
 // - sftp.Filecmd
 func NewSFTPDriver(perms *ssh.Permissions) sftp.Handlers {
-	handler := &sftpDriver{endpoint: fmt.Sprintf("127.0.0.1:%s", globalMinioPort), permissions: perms}
+	// handler := &sftpDriver{endpoint: fmt.Sprintf("127.0.0.1:%s", globalMinioPort), permissions: perms}
+	handler := &sftpDriver{endpoint: "minio.example.com:443", permissions: perms}
 	return sftp.Handlers{
 		FileGet:  handler,
 		FilePut:  handler,
@@ -107,7 +108,7 @@ func (f *sftpDriver) getMinIOClient() (*minio.Client, error) {
 	)
 	return minio.New(f.endpoint, &minio.Options{
 		Creds:     mcreds,
-		Secure:    globalIsTLS,
+		Secure:    true,
 		Transport: globalRemoteFTPClientTransport,
 	})
 }
