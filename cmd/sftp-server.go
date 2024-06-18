@@ -142,10 +142,12 @@ func authenticateSSHConnection(c ssh.ConnMetadata, key ssh.PublicKey, pass []byt
 		}
 	*/
 
-	user, found := strings.CutSuffix(c.User(), "=svc")
-	if found {
-		goto internalAuth
-	}
+	/*
+		user, found := strings.CutSuffix(c.User(), "=svc")
+		if found {
+			goto internalAuth
+		}
+	*/
 
 	/*
 		if globalIAMSys.LDAPConfig.Enabled() {
@@ -156,34 +158,46 @@ func authenticateSSHConnection(c ssh.ConnMetadata, key ssh.PublicKey, pass []byt
 		}
 	*/
 
-internalAuth:
-	ui, ok := globalIAMSys.GetUser(context.Background(), user)
-	if !ok {
-		return nil, errNoSuchUser
-	}
+	/*
+		internalAuth:
+			ui, ok := globalIAMSys.GetUser(context.Background(), user)
+			if !ok {
+				return nil, errNoSuchUser
+			}
 
-	if caPublicKey != nil {
-		err := validateKey(c, key)
-		if err != nil {
-			return nil, errAuthentication
-		}
-	} else {
+			if caPublicKey != nil {
+				err := validateKey(c, key)
+				if err != nil {
+					return nil, errAuthentication
+				}
+			} else {
 
-		// Temporary credentials are not allowed.
-		if ui.Credentials.IsTemp() {
-			return nil, errAuthentication
-		}
+				// Temporary credentials are not allowed.
+				if ui.Credentials.IsTemp() {
+					return nil, errAuthentication
+				}
 
-		if subtle.ConstantTimeCompare([]byte(ui.Credentials.SecretKey), pass) != 1 {
-			return nil, errAuthentication
-		}
-	}
+				if subtle.ConstantTimeCompare([]byte(ui.Credentials.SecretKey), pass) != 1 {
+					return nil, errAuthentication
+				}
+			}
+	*/
+
+	/*
+		return &ssh.Permissions{
+			CriticalOptions: map[string]string{
+				"AccessKey":    ui.Credentials.AccessKey,
+				"SecretKey":    ui.Credentials.SecretKey,
+				"SessionToken": ui.Credentials.SessionToken,
+			},
+			Extensions: make(map[string]string),
+		}, nil
+	*/
 
 	return &ssh.Permissions{
 		CriticalOptions: map[string]string{
-			"AccessKey":    ui.Credentials.AccessKey,
-			"SecretKey":    ui.Credentials.SecretKey,
-			"SessionToken": ui.Credentials.SessionToken,
+			"AccessKey": c.User(),
+			"SecretKey": string(pass),
 		},
 		Extensions: make(map[string]string),
 	}, nil
