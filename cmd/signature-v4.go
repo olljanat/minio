@@ -41,6 +41,7 @@ import (
 	"github.com/minio/minio/internal/auth"
 	"github.com/minio/minio/internal/hash/sha256"
 	xhttp "github.com/minio/minio/internal/http"
+	"github.com/minio/minio/internal/logger"
 )
 
 // AWS Signature Version '4' constants.
@@ -197,6 +198,8 @@ func doesPolicySignatureV4Match(formValues http.Header) (auth.Credentials, APIEr
 
 	// Verify signature.
 	if !compareSignatureV4(newSignature, formValues.Get(xhttp.AmzSignature)) {
+		logger.Error("a) Expected signature: %v Found signature: %v\r\n", newSignature, formValues.Get(xhttp.AmzSignature))
+		logger.Error("Message to sign: %v\r\n", formValues.Get("Policy"))
 		return cred, ErrSignatureDoesNotMatch
 	}
 
@@ -292,22 +295,27 @@ func doesPresignedSignatureMatch(hashedPayload string, r *http.Request, region s
 
 	// Verify if date query is same.
 	if req.Form.Get(xhttp.AmzDate) != query.Get(xhttp.AmzDate) {
+		logger.Error("Expected date: %v Found: %v\r\n", req.Form.Get(xhttp.AmzDate), query.Get(xhttp.AmzDate))
 		return ErrSignatureDoesNotMatch
 	}
 	// Verify if expires query is same.
 	if req.Form.Get(xhttp.AmzExpires) != query.Get(xhttp.AmzExpires) {
+		logger.Error("Expected expires: %v Found: %v\r\n", req.Form.Get(xhttp.AmzExpires), query.Get(xhttp.AmzExpires))
 		return ErrSignatureDoesNotMatch
 	}
 	// Verify if signed headers query is same.
 	if req.Form.Get(xhttp.AmzSignedHeaders) != query.Get(xhttp.AmzSignedHeaders) {
+		logger.Error("Expected AmzSignedHeaders: %v Found: %v\r\n", req.Form.Get(xhttp.AmzSignedHeaders), query.Get(xhttp.AmzSignedHeaders))
 		return ErrSignatureDoesNotMatch
 	}
 	// Verify if credential query is same.
 	if req.Form.Get(xhttp.AmzCredential) != query.Get(xhttp.AmzCredential) {
+		logger.Error("Expected AmzCredential: %v Found: %v\r\n", req.Form.Get(xhttp.AmzCredential), query.Get(xhttp.AmzCredential))
 		return ErrSignatureDoesNotMatch
 	}
 	// Verify if sha256 payload query is same.
 	if clntHashedPayload != "" && clntHashedPayload != query.Get(xhttp.AmzContentSha256) {
+		logger.Error("Expected SHA 256: %v Found: %v\r\n", clntHashedPayload, query.Get(xhttp.AmzContentSha256))
 		return ErrContentSHA256Mismatch
 	}
 	// Verify if security token is correct.
@@ -332,6 +340,8 @@ func doesPresignedSignatureMatch(hashedPayload string, r *http.Request, region s
 
 	// Verify signature.
 	if !compareSignatureV4(req.Form.Get(xhttp.AmzSignature), newSignature) {
+		logger.Error("b) Expected signature: %v Found signature: %v\r\n", newSignature, req.Form.Get(xhttp.AmzSignature))
+		logger.Error("Message to sign: %v\r\n", presignedStringToSign)
 		return ErrSignatureDoesNotMatch
 	}
 
@@ -400,6 +410,22 @@ func doesSignatureMatch(hashedPayload string, r *http.Request, region string, st
 
 	// Verify if signature match.
 	if !compareSignatureV4(newSignature, signV4Values.Signature) {
+		logger.Error("c) Expected signature: %v Found signature: %v\r\n", newSignature, signV4Values.Signature)
+		str := strings.Replace(stringToSign, "\n", "|", -1)
+		logger.Error("DEBUG:|%v|", str)
+		str = strings.Replace(canonicalRequest, "\n", "|", -1)
+		logger.Error("DEBUG:|%v|", str)
+
+		logger.Error("Time: |%v|\r\n", t.Format(iso8601Format))
+		logger.Error("Scope: |%v|\r\n", signV4Values.Credential.getScope())
+		logger.Error("Using signing key: |%v|\r\n", signingKey)
+		logger.Error("Secret: |%v|\r\n", cred.SecretKey)
+		logger.Error("Cred date: |%v|\r\n", signV4Values.Credential.scope.date)
+		logger.Error("Region: |%v|\r\n", signV4Values.Credential.scope.region)
+		logger.Error("Stype: |%v|\r\n", stype)
+
+		logger.Error("Message to sign: |%v|\r\n", stringToSign)
+		logger.Error("Canonical Request: |%v|\r\n", canonicalRequest)
 		return ErrSignatureDoesNotMatch
 	}
 

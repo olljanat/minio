@@ -2,7 +2,7 @@ module github.com/minio/minio
 
 go 1.23
 
-toolchain go1.23.6
+toolchain go1.23.1
 
 require (
 	cloud.google.com/go/storage v1.46.0

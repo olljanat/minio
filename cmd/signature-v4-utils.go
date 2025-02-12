@@ -204,6 +204,7 @@ func extractSignedHeaders(signedHeaders []string, r *http.Request) (http.Header,
 	// find whether "host" is part of list of signed headers.
 	// if not return ErrUnsignedHeaders. "host" is mandatory.
 	if !slices.Contains(signedHeaders, "host") {
+		logger.Error("a) Host header not signed %v\r\n")
 		return nil, ErrUnsignedHeaders
 	}
 	extractedSignedHeaders := make(http.Header)
@@ -250,6 +251,7 @@ func extractSignedHeaders(signedHeaders []string, r *http.Request) (http.Header,
 			// calculation to be compatible with such clients.
 			extractedSignedHeaders.Set(header, strconv.FormatInt(r.ContentLength, 10))
 		default:
+			logger.Error("b) Header %v not signed\r\n", header)
 			return nil, ErrUnsignedHeaders
 		}
 	}
@@ -272,6 +274,7 @@ func checkMetaHeaders(signedHeadersMap http.Header, r *http.Request) APIErrorCod
 			if signedHeadersMap.Get(k) == val[0] {
 				continue
 			}
+			logger.Error("b) Header %v not signed\r\n", k)
 			return ErrUnsignedHeaders
 		}
 	}

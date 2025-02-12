@@ -138,6 +138,8 @@ func printServerCommonMsg(apiEndpoints []string) {
 		}
 	}
 
+	logger.Error("Does THIS works?\r\n")
+
 	printEventNotifiers()
 	printLambdaTargets()
 }

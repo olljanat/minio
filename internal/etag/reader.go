@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"hash"
 	"io"
+
+	"github.com/minio/minio/internal/logger"
 )
 
 // Tagger is the interface that wraps the basic ETag method.
@@ -132,6 +134,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 
 	if err == io.EOF && len(r.checksum) != 0 {
 		if etag := r.ETag(); !Equal(etag, r.checksum) {
+			logger.Error("h) expected eTag: %v Calculated: %v\r\n", r.checksum, etag)
 			return n, VerifyError{
 				Expected: r.checksum,
 				Computed: etag,

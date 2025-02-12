@@ -30,6 +30,7 @@ import (
 	"github.com/minio/minio/internal/etag"
 	"github.com/minio/minio/internal/hash/sha256"
 	"github.com/minio/minio/internal/ioutil"
+	"github.com/minio/minio/internal/logger"
 )
 
 // A Reader wraps an io.Reader and computes the MD5 checksum
@@ -104,6 +105,7 @@ func NewReader(ctx context.Context, src io.Reader, size int64, md5Hex, sha256Hex
 func newReader(ctx context.Context, src io.Reader, size int64, md5Hex, sha256Hex string, actualSize int64, disableMD5 bool, forceMD5 []byte) (*Reader, error) {
 	MD5, err := hex.DecodeString(md5Hex)
 	if err != nil {
+		logger.Error("a) expected md5Hex: %v\r\n", md5Hex)
 		return nil, BadDigest{ // TODO(aead): Return an error that indicates that an invalid ETag has been specified
 			ExpectedMD5:   md5Hex,
 			CalculatedMD5: "",
@@ -111,6 +113,7 @@ func newReader(ctx context.Context, src io.Reader, size int64, md5Hex, sha256Hex
 	}
 	SHA256, err := hex.DecodeString(sha256Hex)
 	if err != nil {
+		logger.Error("d) expected sha256Hex: %v\r\n", sha256Hex)
 		return nil, SHA256Mismatch{ // TODO(aead): Return an error that indicates that an invalid Content-SHA256 has been specified
 			ExpectedSHA256:   sha256Hex,
 			CalculatedSHA256: "",
@@ -124,12 +127,14 @@ func newReader(ctx context.Context, src io.Reader, size int64, md5Hex, sha256Hex
 			return nil, errors.New("hash: already read from hash reader")
 		}
 		if len(r.checksum) != 0 && len(MD5) != 0 && !etag.Equal(r.checksum, MD5) {
+			logger.Error("b) expected md5Hex: %v Calculated: %v\r\n", r.checksum.String(), md5Hex)
 			return nil, BadDigest{
 				ExpectedMD5:   r.checksum.String(),
 				CalculatedMD5: md5Hex,
 			}
 		}
 		if len(r.contentSHA256) != 0 && len(SHA256) != 0 && !bytes.Equal(r.contentSHA256, SHA256) {
+			logger.Error("e) expected md5Hex: %v Calculated: %v\r\n", hex.EncodeToString(r.contentSHA256), sha256Hex)
 			return nil, SHA256Mismatch{
 				ExpectedSHA256:   hex.EncodeToString(r.contentSHA256),
 				CalculatedSHA256: sha256Hex,
@@ -297,6 +302,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 	}
 	if err != nil && err != io.EOF {
 		if v, ok := err.(etag.VerifyError); ok {
+			logger.Error("c) expected md5Hex: %v Calculated: %v\r\n", v.Expected.String(), v.Computed.String())
 			return n, BadDigest{
 				ExpectedMD5:   v.Expected.String(),
 				CalculatedMD5: v.Computed.String(),

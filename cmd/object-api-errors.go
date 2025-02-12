@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/minio/minio/internal/logger"
 )
 
 // Converts underlying storage error. Convenience function written to
@@ -748,6 +750,7 @@ func isErrVersionNotFound(err error) bool {
 // isErrSignatureDoesNotMatch - Check if error type is SignatureDoesNotMatch.
 func isErrSignatureDoesNotMatch(err error) bool {
 	var signatureDoesNotMatch SignatureDoesNotMatch
+	logger.Error("HERE 2!!!\r\n")
 	return errors.As(err, &signatureDoesNotMatch)
 }
 
