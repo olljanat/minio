@@ -265,3 +265,5 @@ require (
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
+
+replace github.com/minio/pkg/v3 v3.1.0 => github.com/olljanat/minio-pkg/v3 v3.0.0-20250505111000-bb54569df7fd

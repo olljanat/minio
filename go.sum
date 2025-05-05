@@ -447,8 +447,6 @@ github.com/minio/minio-go/v7 v7.0.90 h1:TmSj1083wtAD0kEYTx7a5pFsv3iRYMsOJ6A4crjA
 github.com/minio/minio-go/v7 v7.0.90/go.mod h1:uvMUcGrpgeSAAI6+sD3818508nUyMULw94j2Nxku/Go=
 github.com/minio/mux v1.9.2 h1:dQchne49BUBgOlxIHjx5wVe1gl5VXF2sxd4YCXkikTw=
 github.com/minio/mux v1.9.2/go.mod h1:OuHAsZsux+e562bcO2P3Zv/P0LMo6fPQ310SmoyG7mQ=
-github.com/minio/pkg/v3 v3.1.0 h1:RoR1TMXV5y4LvKPkaB1WoeuM6CO7A+I55xYb1tzrvLQ=
-github.com/minio/pkg/v3 v3.1.0/go.mod h1:8vhmdRv9EQnY6a+/gL9mKeIlzkhBsmhYGEmWKHW0uc4=
 github.com/minio/selfupdate v0.6.0 h1:i76PgT0K5xO9+hjzKcacQtO7+MjJ4JKA8Ak8XQ9DDwU=
 github.com/minio/selfupdate v0.6.0/go.mod h1:bO02GTIPCMQFTEvE5h4DjYB58bCoZ35XLeBf0buTDdM=
 github.com/minio/sha256-simd v0.1.1/go.mod h1:B5e1o+1/KgNmWrSQK08Y6Z1Vb5pwIktudl0J58iy0KM=
@@ -512,6 +510,8 @@ github.com/oklog/ulid v1.3.1 h1:EGfNDEx6MqHz8B3uNV6QAib1UR2Lm97sHi3ocA6ESJ4=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
+github.com/olljanat/minio-pkg/v3 v3.0.0-20250505111000-bb54569df7fd h1:Ah+KfgHS8vcWWYcv/g23gyHob4BzcgNAzXd6INUb6Rg=
+github.com/olljanat/minio-pkg/v3 v3.0.0-20250505111000-bb54569df7fd/go.mod h1:XIUU35+I9lWuTuMf94pwnQjvli6nZfRND6TjZGgqSEE=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/pascaldekloe/goe v0.1.0/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
